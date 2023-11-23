@@ -5,19 +5,19 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-fn load_dictionary() -> HashSet<String> {
-    let path = Path::new("words.txt");
+pub fn load_file_by_line(path: &str) -> HashSet<String> {
+    let path = Path::new(&path);
     let file = File::open(&path).unwrap();
     let reader = io::BufReader::new(file);
 
-    let mut words = HashSet::new();
+    let mut lines = HashSet::new();
 
     for line in reader.lines() {
         let word = line.unwrap();
-        words.insert(word);
+        lines.insert(word);
     }
     
-    return words;
+    return lines;
 }
 
 pub fn fixed_xor(bytes1: &[u8], bytes2: &[u8]) -> Result<String, String> {
@@ -43,10 +43,8 @@ pub fn compute_score(v: &[u8], dict: &HashSet<String>) -> u32 {
     return score;
 }
 
-pub fn break_single_byte_xor(input: &[u8]) -> u8 {
-    let dict = load_dictionary();
-    // We consider arbitrary bytes here because of challenges 19 and 20.
+pub fn break_single_byte_xor(input: &[u8], dictionary: &HashSet<String>) -> u8 {
     (0u8..=255)
-        .max_by_key(|&u| compute_score(&input.xor(&[u]), &dict))
+        .max_by_key(|&u| compute_score(&input.xor(&[u]), &dictionary))
         .unwrap()
 }
