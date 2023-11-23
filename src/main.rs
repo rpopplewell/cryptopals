@@ -47,15 +47,22 @@
 //     }
 // }
 
-use xor_cipher::rep_key_xor;
+use xor_cipher::{rep_key_xor, character_frequency_score};
 
 //CHALLENGE 5 Implement repeating-key XOR
-fn main() {
-    let input_string = "Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal".as_bytes();
-    let key = "ICE".as_bytes();
+// fn main() {
+//     let input_string = "Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal".as_bytes();
+//     let key = "ICE".as_bytes();
 
-    let encrypted = hex::encode(rep_key_xor(&key, &input_string));
-    println!("{}", encrypted);
+//     let encrypted = hex::encode(rep_key_xor(&key, &input_string));
+//     println!("{}", encrypted);
+// }
+
+fn main() {
+    let bytes1 = b"zwijrioq!";
+    // let bytes1 = b"wokka wokka!!!";
+    let res = character_frequency_score(bytes1);
+    println!("{:?}", res);
 }
 
 // fn hex_to_plaintext(input: String) -> Result<String, String> {
