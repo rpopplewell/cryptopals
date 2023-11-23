@@ -47,8 +47,7 @@
 //     }
 // }
 
-use rep_key_xor::rep_key_xor;
-mod rep_key_xor;
+use xor_cipher::rep_key_xor;
 
 //CHALLENGE 5 Implement repeating-key XOR
 fn main() {

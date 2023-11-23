@@ -9,3 +9,4 @@ edition = "2021"
 base64 = "0.21.5"
 hex = "0.4.3"
 xor = { path = "./xor" }
+xor_cipher ={ path = "./xor_cipher" }
