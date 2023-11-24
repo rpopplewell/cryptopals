@@ -4,6 +4,8 @@ use std::str;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use itertools::{Combinations, Itertools};
+
 
 const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
     (' ', 12.17),
@@ -82,7 +84,7 @@ fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
     })
 }
 
-pub fn character_frequency_score(cipher_message: &[u8]) -> f32 {
+fn character_frequency_score(cipher_message: &[u8]) -> f32 {
     let expected_freqs = HashMap::from(EXPECTED_FREQUENCIES);
     get_frequency_map(cipher_message).iter().
     map(|(key, val)| {
@@ -100,6 +102,23 @@ fn hamming_score(bytes1: &[u8], bytes2: &[u8]) -> u32 {
     fold(0u32, |a, b| {a + b})
 }
 
+fn get_keysize(encrypted_bytes: &[u8]) -> u32 {
+    let mut lowest_score: u32 = u32::MAX;
+    let mut lowest_score_keysize: u32 = 0;
+    for keysize in 1..40 {
+        let chunks = encrypted_bytes.chunks(keysize).collect::<Vec<&[u8]>>();
+        let score = chunks.into_iter().tuple_combinations::<(&[u8], &[u8])>().
+        fold(0u32, |x, chunk_pair| {
+            x + hamming_score(chunk_pair.0, chunk_pair.1)
+        });
+        if score < lowest_score {
+            lowest_score = score;
+            lowest_score_keysize = keysize as u32;
+        }
+    }
+    return lowest_score_keysize;
+}
+
 pub fn break_single_byte_xor(input: &[u8], dictionary: &HashSet<String>) -> u8 {
     (0u8..=255)
         .max_by_key(|&u| word_score(&input.xor(&[u]), &dictionary))
@@ -112,6 +131,9 @@ pub fn break_single_byte_xor_frequency(input: &[u8]) -> u8 {
         .unwrap()
 }
 
-pub fn break_rep_key_xor() {
-    
+pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
+    let keysize: u32 = get_keysize(encrypted_bytes);
+    //next we transpose the blocks
+    //then we solve single key xor cipher on each block with KEYSIZE different single byte keys
+    //then we transpose the blocks back
 }

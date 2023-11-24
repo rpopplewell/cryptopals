@@ -6,3 +6,4 @@ edition = "2021"
 
 [dependencies]
 xor = { path = "../xor"}
+itertools = "0.12.0"
