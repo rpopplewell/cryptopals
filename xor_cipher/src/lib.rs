@@ -1,10 +1,11 @@
 use xor::XOR;
 use std::collections::{HashSet, HashMap};
-use std::str;
+use std::ops::{Div, Mul};
+use std::{str, usize};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use itertools::{Combinations, Itertools};
+use itertools::Itertools;
 
 
 const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
@@ -84,7 +85,7 @@ fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
     })
 }
 
-fn character_frequency_score(cipher_message: &[u8]) -> f32 {
+pub fn character_frequency_score(cipher_message: &[u8]) -> f32 {
     let expected_freqs = HashMap::from(EXPECTED_FREQUENCIES);
     get_frequency_map(cipher_message).iter().
     map(|(key, val)| {
@@ -96,27 +97,30 @@ fn character_frequency_score(cipher_message: &[u8]) -> f32 {
     fold(0f32, |a, x| {a + x})
 }
 
-fn hamming_score(bytes1: &[u8], bytes2: &[u8]) -> u32 {
+fn hamming_score(bytes1: &[u8], bytes2: &[u8]) -> f64 {
     fixed_xor(bytes1, bytes2).into_iter().
-    map(|byte| byte.count_ones()).
-    fold(0u32, |a, b| {a + b})
+    map(|byte| byte.count_ones() as f64).
+    fold(0f64, |a, b| {a + b})
 }
 
-fn get_keysize(encrypted_bytes: &[u8]) -> u32 {
-    let mut lowest_score: u32 = u32::MAX;
-    let mut lowest_score_keysize: u32 = 0;
+fn get_norm(msg_len: usize, keysize: usize) -> f64 {
+    let n = msg_len.div(keysize) as f64;
+    n.mul(n - 1.0f64).div(2.0f64).mul(keysize as f64)
+}
+
+fn get_keysizes(encrypted_bytes: &[u8]) -> Vec<(usize, f64)> {
+    let mut scores: Vec<(usize, f64)> = Vec::new();
     for keysize in 1..40 {
+        let norm = get_norm(encrypted_bytes.len(), keysize);
         let chunks = encrypted_bytes.chunks(keysize).collect::<Vec<&[u8]>>();
         let score = chunks.into_iter().tuple_combinations::<(&[u8], &[u8])>().
-        fold(0u32, |x, chunk_pair| {
+        fold(0f64, |x, chunk_pair| {
             x + hamming_score(chunk_pair.0, chunk_pair.1)
-        });
-        if score < lowest_score {
-            lowest_score = score;
-            lowest_score_keysize = keysize as u32;
-        }
+        }).div(norm);
+        scores.push((keysize, score));
     }
-    return lowest_score_keysize;
+    scores.sort_by(|a, b| a.1.total_cmp(&b.1));
+    return scores;
 }
 
 pub fn break_single_byte_xor(input: &[u8], dictionary: &HashSet<String>) -> u8 {
@@ -132,7 +136,21 @@ pub fn break_single_byte_xor_frequency(input: &[u8]) -> u8 {
 }
 
 pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
-    let keysize: u32 = get_keysize(encrypted_bytes);
+    let keysizes = get_keysizes(encrypted_bytes);
+    for keysize_score in keysizes {
+        let keysize = keysize_score.0;
+        let transpose = encrypted_bytes.into_iter().enumerate().
+        fold(vec![Vec::new(); keysize],|mut trans, (i, byte)| {
+            let index = i.checked_rem(keysize).unwrap();
+            trans[index].push(*byte);
+            return trans;
+        });
+        for t in transpose {
+            println!("{:?}", t);
+            break_single_byte_xor_frequency(&t);
+        }
+    }
+    // println!("{:?}", transpose);
     //next we transpose the blocks
     //then we solve single key xor cipher on each block with KEYSIZE different single byte keys
     //then we transpose the blocks back
