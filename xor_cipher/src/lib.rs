@@ -8,7 +8,7 @@ use std::path::Path;
 use itertools::Itertools;
 
 
-const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
+const EXPECTED_FREQUENCIES: [(char, f32); 29] = [
     (' ', 12.17),
     ('.', 6.57),
     ('a', 6.09),
@@ -37,6 +37,7 @@ const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
     ('x', 0.24),
     ('y', 1.30),
     ('z', 0.03),
+    ('\n', 0.02),
 ];
 
 pub fn load_file_by_line(path: &str) -> HashSet<String> {
@@ -54,11 +55,11 @@ pub fn load_file_by_line(path: &str) -> HashSet<String> {
     return lines;
 }
 
-// fn hex_to_plaintext(input: String) -> Result<String, String> {
-//     hex::decode(input).map_err(|e| e.to_string()).
-//     and_then(|bytes| String::from_utf8(bytes).
-//     map_err(|e| e.to_string()))
-// }
+pub fn hex_to_plaintext(input: String) -> Result<String, String> {
+    hex::decode(input).map_err(|e| e.to_string()).
+    and_then(|bytes| String::from_utf8(bytes).
+    map_err(|e| e.to_string()))
+}
 
 // fn hex_to_base64(input: &str) -> Result<String, hex::FromHexError> {
 //     hex::decode(input).
@@ -89,24 +90,47 @@ fn word_score(v: &[u8], dict: &HashSet<String>) -> u32 {
 
 fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
     let plaintext = str::from_utf8(cipher_message).unwrap_or(" ");
+    let text_length = plaintext.len() as f32;
+    let normed_increment = 1.0f32.div(text_length);
 
-    plaintext.to_lowercase().chars().
+    let freq_map = plaintext.to_lowercase().chars().
     fold(HashMap::new(), |mut map, c| { 
-        *map.entry(c).or_insert(0.0f32) += 1.0f32.div_euclid(plaintext.len() as f32);
+        let _ = *map.entry(c).and_modify(
+            |counter| *counter += normed_increment
+        ).
+        or_insert(normed_increment);
         return map;
-    })
+    });
+    return freq_map;
+}
+
+fn normalize_map(hashmap: &mut HashMap<char, f32>, n: f32) {
+    for value in hashmap.values_mut() {
+        *value /= n;
+    }
 }
 
 pub fn character_frequency_score(cipher_message: &[u8]) -> f32 {
-    let expected_freqs = HashMap::from(EXPECTED_FREQUENCIES);
-    get_frequency_map(cipher_message).iter().
+    let text_length = cipher_message.len() as f32;
+
+    //check if can be converted into text, if not then return max score
+    match String::from_utf8(cipher_message.to_vec()) {
+        Ok(..) => {}
+        Err(..) => {return std::f32::MAX}
+    }
+
+    //otherwise we compute residual wrt expected frequencies
+    let mut expected_freqs = HashMap::from(EXPECTED_FREQUENCIES);
+    normalize_map(&mut expected_freqs, text_length);
+    let score = get_frequency_map(cipher_message).iter().
     map(|(key, val)| {
         match expected_freqs.get(&key) {
             Some(e_freq) => {return (e_freq - val).powi(2)}
             None => {return 100f32}
         }
     }).
-    fold(0f32, |a, x| {a + x})
+    fold(0f32, |a, x| {a + x});
+    return score;
 }
 
 fn hamming_score(bytes1: &[u8], bytes2: &[u8]) -> f64 {
@@ -143,7 +167,7 @@ pub fn break_single_byte_xor(input: &[u8], dictionary: &HashSet<String>) -> u8 {
 
 pub fn break_single_byte_xor_frequency(input: &[u8]) -> u8 {
     (0u8..=255)
-        .max_by_key(|&u| character_frequency_score(&input.xor(&[u])) as u128)
+        .min_by_key(|&u| character_frequency_score(&input.xor(&[u])) as u128)
         .unwrap()
 }
 
@@ -169,7 +193,6 @@ fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
 
 pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
     let keysizes = get_keysizes(encrypted_bytes);
-    println!("{:?}", keysizes);
     for keysize_score in keysizes {
         let keysize = keysize_score.0;
         let transpose = encrypted_bytes.into_iter().enumerate().

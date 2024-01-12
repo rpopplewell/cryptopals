@@ -26,26 +26,24 @@
 //     println!("{ans}");
 // }
 
-// CHALLENGE 4
-// use xor_cypher::{break_single_byte_xor, compute_score};
-// mod xor_cypher;
+// use xor_cipher::{hex_to_plaintext, break_single_byte_xor_frequency};
 // fn main() {
-//     let dictionary = xor_cypher::load_file_by_line("words.txt");
-//     let lines = xor_cypher::load_file_by_line("findit.txt");
-//     for line in lines {
-//         println!("{line}");
+//     // let dictionary = xor_cipher::load_file_by_line("words.txt");
+//     let lines = xor_cipher::load_file_by_line("findit.txt");
+//     for line in lines.iter() {
 //         let input_text = hex_to_plaintext(line.clone()).unwrap_or("".to_string());
-//         let key = break_single_byte_xor(input_text.as_bytes(), &dictionary);
+//         let key = break_single_byte_xor_frequency(input_text.as_bytes());
 //         let key_vec: Vec<u8> = vec![key; line.len()];
-//         let ans: String;
-//         match xor_cypher::fixed_xor(&key_vec, &input_text.as_bytes()).and_then(hex_to_plaintext) {
-//             Ok(x) => {ans = x}
-//             Err(..) => {continue;}
-//         };
+//         let decrypted_bytes = xor_cipher::fixed_xor(&key_vec, &input_text.as_bytes());
 
-//     println!("{ans}");
+//         let ans = String::from_utf8(decrypted_bytes).unwrap_or_default();
+
+//         if ans != String::default() {
+//             println!("{ans}");
+//         }
 //     }
 // }
+
 
 //CHALLENGE 5 Implement repeating-key XOR
 // fn main() {
@@ -55,6 +53,8 @@
 //     let encrypted = hex::encode(rep_key_xor(&key, &input_string));
 //     println!("{}", encrypted);
 // }
+
+// CHALLENGE 6
 
 use base64::prelude::*;
 use xor_cipher::break_rep_key_xor;
