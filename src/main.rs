@@ -64,15 +64,3 @@ fn main() {
     let res = break_rep_key_xor(bytes1);
     println!("{:?}", res);
 }
-
-// fn hex_to_plaintext(input: String) -> Result<String, String> {
-//     hex::decode(input).map_err(|e| e.to_string()).
-//     and_then(|bytes| String::from_utf8(bytes).
-//     map_err(|e| e.to_string()))
-// }
-
-// fn hex_to_base64(input: &str) -> Result<String, FromHexError> {
-//     let var = hex::decode(input).
-//     map(|decoded| general_purpose::STANDARD.encode(decoded));
-//     return var;
-// }

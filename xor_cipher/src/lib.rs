@@ -6,6 +6,8 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use itertools::Itertools;
+use hex;
+use base64::Engine;
 
 
 const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
@@ -54,6 +56,17 @@ pub fn load_file_by_line(path: &str) -> HashSet<String> {
     return lines;
 }
 
+fn hex_to_plaintext(input: String) -> Result<String, String> {
+    hex::decode(input).map_err(|e| e.to_string()).
+    and_then(|bytes| String::from_utf8(bytes).
+    map_err(|e| e.to_string()))
+}
+
+fn hex_to_base64(input: &str) -> Result<String, hex::FromHexError> {
+    hex::decode(input).
+    map(|decoded| base64::engine::general_purpose::STANDARD.encode(decoded))
+}
+
 pub fn fixed_xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
     bytes1.iter().zip(bytes2.iter()).
     map(|(&x1, &x2)| x1 ^ x2).collect::<Vec<u8>>()
@@ -77,7 +90,8 @@ fn word_score(v: &[u8], dict: &HashSet<String>) -> u32 {
 }
 
 fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
-    let plaintext = str::from_utf8(cipher_message).unwrap();
+    let plaintext = str::from_utf8(cipher_message).unwrap_or(" ");
+
     plaintext.to_lowercase().chars().
     fold(HashMap::new(), |mut map, c| { 
         *map.entry(c).or_insert(0.0f32) += 1.0f32.div_euclid(plaintext.len() as f32);
@@ -135,6 +149,26 @@ pub fn break_single_byte_xor_frequency(input: &[u8]) -> u8 {
         .unwrap()
 }
 
+pub fn decrypt_single_byte_xor_frequency(input: Vec<u8>) -> Vec<u8> {
+    let key = break_single_byte_xor_frequency(&input);
+    let key_vec: Vec<u8> = vec![key; input.len()];
+    fixed_xor(&key_vec, &input)
+}
+
+fn tpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>>
+where
+    T: Clone,
+{
+    assert!(!v.is_empty());
+    (0..v[0].len())
+        .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
+        .collect()
+}
+
+fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
+    nested.into_iter().flatten().collect()
+}
+
 pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
     let keysizes = get_keysizes(encrypted_bytes);
     for keysize_score in keysizes {
@@ -145,13 +179,15 @@ pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
             trans[index].push(*byte);
             return trans;
         });
-        for t in transpose {
-            println!("{:?}", t);
-            break_single_byte_xor_frequency(&t);
-        }
+
+        let blocks: Vec<Vec<u8>> = transpose.into_iter().map(|input| { 
+            decrypt_single_byte_xor_frequency(input)
+        }).collect();
+
+        let k = flatten(tpose(blocks));
+
+        println!("{:?}", k);
+
+        break
     }
-    // println!("{:?}", transpose);
-    //next we transpose the blocks
-    //then we solve single key xor cipher on each block with KEYSIZE different single byte keys
-    //then we transpose the blocks back
 }
