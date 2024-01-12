@@ -56,11 +56,16 @@
 //     println!("{}", encrypted);
 // }
 
+use base64::prelude::*;
 use xor_cipher::break_rep_key_xor;
 
 fn main() {
-    let bytes1 = b"0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272
-    a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f!";
-    let res = break_rep_key_xor(bytes1);
-    println!("{:?}", res);
+    let input: String = include_str!("../6.txt").replace('\n', "");
+    println!("{:?}", input);
+    let bytes_res = BASE64_STANDARD.decode(input.as_bytes());
+    println!("{:?}", bytes_res);
+    match bytes_res {
+        Ok(x) => {break_rep_key_xor(x.as_slice())}
+        Err(err) => {panic!("{:?}", err)}
+    }
 }

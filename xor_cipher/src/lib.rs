@@ -6,8 +6,6 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use itertools::Itertools;
-use hex;
-use base64::Engine;
 
 
 const EXPECTED_FREQUENCIES: [(char, f32); 28] = [
@@ -56,16 +54,16 @@ pub fn load_file_by_line(path: &str) -> HashSet<String> {
     return lines;
 }
 
-fn hex_to_plaintext(input: String) -> Result<String, String> {
-    hex::decode(input).map_err(|e| e.to_string()).
-    and_then(|bytes| String::from_utf8(bytes).
-    map_err(|e| e.to_string()))
-}
+// fn hex_to_plaintext(input: String) -> Result<String, String> {
+//     hex::decode(input).map_err(|e| e.to_string()).
+//     and_then(|bytes| String::from_utf8(bytes).
+//     map_err(|e| e.to_string()))
+// }
 
-fn hex_to_base64(input: &str) -> Result<String, hex::FromHexError> {
-    hex::decode(input).
-    map(|decoded| base64::engine::general_purpose::STANDARD.encode(decoded))
-}
+// fn hex_to_base64(input: &str) -> Result<String, hex::FromHexError> {
+//     hex::decode(input).
+//     map(|decoded| base64::engine::general_purpose::STANDARD.encode(decoded))
+// }
 
 pub fn fixed_xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
     bytes1.iter().zip(bytes2.iter()).
@@ -160,7 +158,7 @@ where
     T: Clone,
 {
     assert!(!v.is_empty());
-    (0..v[0].len())
+    (0..v[0].len()-1)
         .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
         .collect()
 }
@@ -171,6 +169,7 @@ fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
 
 pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
     let keysizes = get_keysizes(encrypted_bytes);
+    println!("{:?}", keysizes);
     for keysize_score in keysizes {
         let keysize = keysize_score.0;
         let transpose = encrypted_bytes.into_iter().enumerate().
@@ -185,9 +184,6 @@ pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
         }).collect();
 
         let k = flatten(tpose(blocks));
-
-        println!("{:?}", k);
-
-        break
+        println!("{:?}", String::from_utf8(k));
     }
 }
