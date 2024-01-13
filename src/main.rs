@@ -70,8 +70,13 @@
 // }
 
 // CHALLENGE 7
-use aes::aes_128;
+// use aes::aes_128;
 
-fn main() {
-    aes_128()
-}
+// fn main() {
+//     let path: &str = "./07.txt";
+//     let res = aes_128((&path).to_string());
+//     let plaintext = String::from_utf8(res).unwrap();
+//     println!("{plaintext}");
+// }
+
+// CHALLENGE 8
