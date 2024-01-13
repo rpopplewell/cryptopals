@@ -56,15 +56,22 @@
 
 // CHALLENGE 6
 
-use base64::prelude::*;
-use xor_cipher::break_rep_key_xor;
+// use base64::prelude::*;
+// use xor_cipher::break_rep_key_xor;
+
+// fn main() {
+//     let input: String = include_str!("../6_prime.txt").replace('\n', "");
+//     let bytes_res = BASE64_STANDARD.decode(input.as_bytes()).unwrap();
+//     let key = break_rep_key_xor(bytes_res.as_slice());
+
+//     let str_key = String::from_utf8(key).unwrap();
+
+//     println!("{str_key}");
+// }
+
+// CHALLENGE 7
+use aes::aes_128;
 
 fn main() {
-    let input: String = include_str!("../6_prime.txt").replace('\n', "");
-    let bytes_res = BASE64_STANDARD.decode(input.as_bytes()).unwrap();
-    let key = break_rep_key_xor(bytes_res.as_slice());
-
-    let str_key = String::from_utf8(key).unwrap();
-
-    println!("{str_key}");
+    aes_128()
 }
