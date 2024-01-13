@@ -7,7 +7,6 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use itertools::Itertools;
 
-
 const EXPECTED_FREQUENCIES: [(char, f32); 29] = [
     (' ', 12.17),
     ('.', 6.57),
@@ -37,7 +36,7 @@ const EXPECTED_FREQUENCIES: [(char, f32); 29] = [
     ('x', 0.24),
     ('y', 1.30),
     ('z', 0.03),
-    ('\n', 0.02),
+    ('\n', 1.0),
 ];
 
 pub fn load_file_by_line(path: &str) -> HashSet<String> {
@@ -60,11 +59,6 @@ pub fn hex_to_plaintext(input: String) -> Result<String, String> {
     and_then(|bytes| String::from_utf8(bytes).
     map_err(|e| e.to_string()))
 }
-
-// fn hex_to_base64(input: &str) -> Result<String, hex::FromHexError> {
-//     hex::decode(input).
-//     map(|decoded| base64::engine::general_purpose::STANDARD.encode(decoded))
-// }
 
 pub fn fixed_xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
     bytes1.iter().zip(bytes2.iter()).
@@ -93,15 +87,15 @@ fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
     let text_length = plaintext.len() as f32;
     let normed_increment = 1.0f32.div(text_length);
 
-    let freq_map = plaintext.to_lowercase().chars().
-    fold(HashMap::new(), |mut map, c| { 
-        let _ = *map.entry(c).and_modify(
-            |counter| *counter += normed_increment
-        ).
-        or_insert(normed_increment);
-        return map;
-    });
-    return freq_map;
+    plaintext.to_lowercase().chars().
+    fold(
+        HashMap::new(), |mut map, c| { 
+            let _ = *map.entry(c).and_modify(
+                |counter| *counter += normed_increment
+            ).
+            or_insert(normed_increment);
+            return map;
+    })
 }
 
 fn normalize_map(hashmap: &mut HashMap<char, f32>, n: f32) {
@@ -144,7 +138,7 @@ fn get_norm(msg_len: usize, keysize: usize) -> f64 {
     n.mul(n - 1.0f64).div(2.0f64).mul(keysize as f64)
 }
 
-fn get_keysizes(encrypted_bytes: &[u8]) -> Vec<(usize, f64)> {
+fn get_keysizes(encrypted_bytes: &[u8]) -> usize {
     let mut scores: Vec<(usize, f64)> = Vec::new();
     for keysize in 1..40 {
         let norm = get_norm(encrypted_bytes.len(), keysize);
@@ -156,7 +150,9 @@ fn get_keysizes(encrypted_bytes: &[u8]) -> Vec<(usize, f64)> {
         scores.push((keysize, score));
     }
     scores.sort_by(|a, b| a.1.total_cmp(&b.1));
-    return scores;
+
+    let best_score = scores.get(0).unwrap();
+    return best_score.0;
 }
 
 pub fn break_single_byte_xor(input: &[u8], dictionary: &HashSet<String>) -> u8 {
@@ -177,36 +173,21 @@ pub fn decrypt_single_byte_xor_frequency(input: Vec<u8>) -> Vec<u8> {
     fixed_xor(&key_vec, &input)
 }
 
-fn tpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>>
-where
-    T: Clone,
-{
-    assert!(!v.is_empty());
-    (0..v[0].len()-1)
-        .map(|i| v.iter().map(|inner| inner[i].clone()).collect::<Vec<T>>())
-        .collect()
+fn transpose(input: &[u8], size: usize) -> Vec<Vec<u8>> {
+    input.into_iter().enumerate().
+    fold(vec![Vec::new(); size],
+    |mut trans, (i, byte)| {
+        let index = i.checked_rem(size).unwrap();
+        trans[index].push(*byte);
+        return trans;
+    })
 }
 
-fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
-    nested.into_iter().flatten().collect()
-}
-
-pub fn break_rep_key_xor(encrypted_bytes: &[u8]) {
-    let keysizes = get_keysizes(encrypted_bytes);
-    for keysize_score in keysizes {
-        let keysize = keysize_score.0;
-        let transpose = encrypted_bytes.into_iter().enumerate().
-        fold(vec![Vec::new(); keysize],|mut trans, (i, byte)| {
-            let index = i.checked_rem(keysize).unwrap();
-            trans[index].push(*byte);
-            return trans;
-        });
-
-        let blocks: Vec<Vec<u8>> = transpose.into_iter().map(|input| { 
-            decrypt_single_byte_xor_frequency(input)
-        }).collect();
-
-        let k = flatten(tpose(blocks));
-        println!("{:?}", String::from_utf8(k));
-    }
+pub fn break_rep_key_xor(encrypted_bytes: &[u8]) -> Vec<u8> {
+    let keysize = get_keysizes(encrypted_bytes);
+    let key: Vec<u8> = transpose(encrypted_bytes, keysize).iter().map(|input| { 
+        break_single_byte_xor_frequency(&input)
+    }).collect();
+    
+    return key;
 }

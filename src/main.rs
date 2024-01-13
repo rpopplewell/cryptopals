@@ -60,12 +60,11 @@ use base64::prelude::*;
 use xor_cipher::break_rep_key_xor;
 
 fn main() {
-    let input: String = include_str!("../6.txt").replace('\n', "");
-    println!("{:?}", input);
-    let bytes_res = BASE64_STANDARD.decode(input.as_bytes());
-    println!("{:?}", bytes_res);
-    match bytes_res {
-        Ok(x) => {break_rep_key_xor(x.as_slice())}
-        Err(err) => {panic!("{:?}", err)}
-    }
+    let input: String = include_str!("../6_prime.txt").replace('\n', "");
+    let bytes_res = BASE64_STANDARD.decode(input.as_bytes()).unwrap();
+    let key = break_rep_key_xor(bytes_res.as_slice());
+
+    let str_key = String::from_utf8(key).unwrap();
+
+    println!("{str_key}");
 }
