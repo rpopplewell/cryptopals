@@ -1,13 +1,17 @@
-use openssl::symm::{decrypt, Cipher};
+use openssl::symm::{decrypt, encrypt, Cipher};
 use base64::prelude::*;
 use std::fs::File;
 use std::io::{self, Read};
 use std::ops::Sub;
 use std::path::Path;
+use xor::{self, XOR};
 
-const KEY: &[u8] = b"YELLOW SUBMARINE";
+pub enum EncryptDecrypt {
+    Encrypt,
+    Decrypt
+}
 
-pub fn aes_128(path: String) -> Vec<u8> {
+pub fn aes_128_ecb(path: String, key: &[u8], ed: EncryptDecrypt) -> Vec<u8> {
     let mut reader = io::BufReader::new(
         File::open(
             &Path::new(&path)
@@ -19,7 +23,18 @@ pub fn aes_128(path: String) -> Vec<u8> {
     let _ = reader.read_to_end(&mut buffer);
     let cipher_text = String::from_utf8(buffer).unwrap().replace("\n", "");
     let cipher_bytes = BASE64_STANDARD.decode(cipher_text).unwrap();
-    decrypt(Cipher::aes_128_ecb(), KEY, None, &cipher_bytes).unwrap()
+
+    let res = match ed {
+        EncryptDecrypt::Encrypt => { decrypt(Cipher::aes_128_ecb(), key, None, &cipher_bytes).unwrap() }
+        EncryptDecrypt::Decrypt => { encrypt(Cipher::aes_128_ecb(), key, None, &cipher_bytes).unwrap() }
+    };
+
+    return res;
+}
+
+pub fn aes_128_cbc(path: String, key: &[u8], iv: Vec<u8>, ed: EncryptDecrypt) -> Vec<u8> {
+    let ebc = aes_128_ecb(path, key ,ed);
+    return XOR::xor(ebc.as_slice(), iv.as_slice());
 }
 
 pub fn pkcs_7_padding(bytes: &[u8], blocksize: usize) -> Vec<u8> {
