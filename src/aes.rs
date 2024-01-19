@@ -1,40 +1,40 @@
+use itertools::Itertools;
+use openssl::cipher;
 use openssl::symm::{decrypt, encrypt, Cipher};
 use base64::prelude::*;
+use std::clone;
 use std::fs::File;
 use std::io::{self, Read};
 use std::ops::Sub;
 use std::path::Path;
 use xor::{self, XOR};
 
+#[derive(Clone, Copy)]
 pub enum EncryptDecrypt {
     Encrypt,
     Decrypt
 }
 
-pub fn aes_128_ecb(path: String, key: &[u8], ed: EncryptDecrypt) -> Vec<u8> {
-    let mut reader = io::BufReader::new(
-        File::open(
-            &Path::new(&path)
-        ).unwrap()
-    );
-
-    let mut buffer = Vec::<u8>::new();
-
-    let _ = reader.read_to_end(&mut buffer);
-    let cipher_text = String::from_utf8(buffer).unwrap().replace("\n", "");
-    let cipher_bytes = BASE64_STANDARD.decode(cipher_text).unwrap();
-
+pub fn aes_128_ecb(input: &[u8], key: &[u8], ed: EncryptDecrypt) -> Vec<u8> {
     let res = match ed {
-        EncryptDecrypt::Encrypt => { decrypt(Cipher::aes_128_ecb(), key, None, &cipher_bytes).unwrap() }
-        EncryptDecrypt::Decrypt => { encrypt(Cipher::aes_128_ecb(), key, None, &cipher_bytes).unwrap() }
+        EncryptDecrypt::Encrypt => { decrypt(Cipher::aes_128_ecb(), key, None, input).unwrap() }
+        EncryptDecrypt::Decrypt => { encrypt(Cipher::aes_128_ecb(), key, None, input).unwrap() }
     };
 
     return res;
 }
 
-pub fn aes_128_cbc(path: String, key: &[u8], iv: Vec<u8>, ed: EncryptDecrypt) -> Vec<u8> {
-    let ebc = aes_128_ecb(path, key ,ed);
-    return XOR::xor(ebc.as_slice(), iv.as_slice());
+pub fn aes_128_cbc(input: &[u8], key: &[u8], iv: Vec<u8>, ed: EncryptDecrypt) -> Vec<u8> {
+    let keysize = key.len();
+    let res = input.chunks(keysize).into_iter().
+    fold(Vec::<u8>::new(),|mut acc, chunk| {
+        let cipher_chunk = aes_128_ecb(chunk, key, ed);
+        let xored_chunk = cipher_chunk.xor(&iv);
+        let iv = xored_chunk.clone();
+        acc.extend_from_slice(&xored_chunk);
+        return acc;
+    });
+    return res;
 }
 
 pub fn pkcs_7_padding(bytes: &[u8], blocksize: usize) -> Vec<u8> {
