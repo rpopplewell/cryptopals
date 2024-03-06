@@ -5,6 +5,7 @@ use openssl::{cipher, rand::rand_bytes};
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use std::clone;
+use std::error::Error;
 use std::fs::File;
 use std::io::{self, Read};
 use std::ops::{Rem, Sub};
@@ -26,11 +27,18 @@ fn rand_bytes_len(len: usize) -> Vec<u8> {
 fn rand_padding(input: &[u8]) -> Vec<u8> {
     let mut rng = thread_rng();
     let padding_lengths: Vec<usize> = rng.sample_iter(Uniform::new(5, 10)).take(2).collect();
-    let rand_padding: Vec<Vec<u8>> = padding_lengths.iter().map(|pl: &usize| rand_bytes_len(*pl)).collect();
-    concat([rand_padding[0].clone(), input.to_vec(), rand_padding[1].clone()])
+    let rand_padding: Vec<Vec<u8>> = padding_lengths
+        .iter()
+        .map(|pl: &usize| rand_bytes_len(*pl))
+        .collect();
+    concat([
+        rand_padding[0].clone(),
+        input.to_vec(),
+        rand_padding[1].clone(),
+    ])
 }
 
-fn encrypt_with_rand_key(input: &[u8]) -> Vec<u8> {
+pub fn random_ecb_cbc_encrypt(input: &[u8]) -> Vec<u8> {
     let padded_input = rand_padding(input);
     let key = rand_bytes_len(16);
     let res: Vec<u8>;
@@ -43,12 +51,18 @@ fn encrypt_with_rand_key(input: &[u8]) -> Vec<u8> {
     res
 }
 
+pub fn ecb_oracle() -> bool {
+    let input = vec![0u8; 16 * 16];
+    let output = random_ecb_cbc_encrypt(input.as_slice());
+    let blocks = output.chunks(16).skip(10).take(2).collect_vec();
+    blocks[0] == blocks[1]
+}
+
 pub fn aes_128_ecb(input: &[u8], key: &[u8], ed: EncryptDecrypt) -> Vec<u8> {
-    let res = match ed {
+    match ed {
         EncryptDecrypt::Encrypt => encrypt(Cipher::aes_128_ecb(), key, None, input).unwrap(),
         EncryptDecrypt::Decrypt => decrypt(Cipher::aes_128_ecb(), key, None, input).unwrap(),
-    };
-    return res;
+    }
 }
 
 pub fn aes_128_cbc(input: &[u8], key: &[u8], iv: Vec<u8>, ed: EncryptDecrypt) -> Vec<u8> {
@@ -74,7 +88,6 @@ pub fn aes_128_cbc(input: &[u8], key: &[u8], iv: Vec<u8>, ed: EncryptDecrypt) ->
             iv_xor = cipher_chunk;
         }
     }
-
     acc
 }
 

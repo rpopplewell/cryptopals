@@ -1,11 +1,11 @@
-use xor::XOR;
-use std::collections::{HashSet, HashMap};
-use std::ops::{Div, Mul};
-use std::{str, usize};
+use itertools::Itertools;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::ops::{Div, Mul};
 use std::path::Path;
-use itertools::Itertools;
+use std::{str, usize};
+use xor::XOR;
 
 const EXPECTED_FREQUENCIES: [(char, f32); 29] = [
     (' ', 12.17),
@@ -50,31 +50,43 @@ pub fn load_file_by_line(path: &str) -> HashSet<String> {
         let word = line.unwrap();
         lines.insert(word);
     }
-    
+
     return lines;
 }
 
 pub fn hex_to_plaintext(input: String) -> Result<String, String> {
-    hex::decode(input).map_err(|e| e.to_string()).
-    and_then(|bytes| String::from_utf8(bytes).
-    map_err(|e| e.to_string()))
+    hex::decode(input)
+        .map_err(|e| e.to_string())
+        .and_then(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
 }
 
 pub fn fixed_xor(bytes1: &[u8], bytes2: &[u8]) -> Vec<u8> {
-    bytes1.iter().zip(bytes2.iter()).
-    map(|(&x1, &x2)| x1 ^ x2).collect::<Vec<u8>>()
+    bytes1
+        .iter()
+        .zip(bytes2.iter())
+        .map(|(&x1, &x2)| x1 ^ x2)
+        .collect::<Vec<u8>>()
 }
 
 pub fn rep_key_xor(key: &[u8], message: &[u8]) -> Vec<u8> {
-    let repeated_key = key.iter().cycle().take(message.len()).cloned().collect::<Vec<u8>>();
+    let repeated_key = key
+        .iter()
+        .cycle()
+        .take(message.len())
+        .cloned()
+        .collect::<Vec<u8>>();
     fixed_xor(&repeated_key, message)
 }
 
 fn get_words(v: &[u8]) -> HashSet<String> {
-    str::from_utf8(v).
-    map(|x| x.split(" ").collect::<Vec<&str>>()).
-    map(|x| x.into_iter().map(|s| s.to_string()).
-    collect::<HashSet<String>>()).unwrap_or(HashSet::from([]))
+    str::from_utf8(v)
+        .map(|x| x.split(" ").collect::<Vec<&str>>())
+        .map(|x| {
+            x.into_iter()
+                .map(|s| s.to_string())
+                .collect::<HashSet<String>>()
+        })
+        .unwrap_or(HashSet::from([]))
 }
 
 fn word_score(v: &[u8], dict: &HashSet<String>) -> u32 {
@@ -87,15 +99,16 @@ fn get_frequency_map(cipher_message: &[u8]) -> HashMap<char, f32> {
     let text_length = plaintext.len() as f32;
     let normed_increment = 1.0f32.div(text_length);
 
-    plaintext.to_lowercase().chars().
-    fold(
-        HashMap::new(), |mut map, c| { 
-            let _ = *map.entry(c).and_modify(
-                |counter| *counter += normed_increment
-            ).
-            or_insert(normed_increment);
+    plaintext
+        .to_lowercase()
+        .chars()
+        .fold(HashMap::new(), |mut map, c| {
+            let _ = *map
+                .entry(c)
+                .and_modify(|counter| *counter += normed_increment)
+                .or_insert(normed_increment);
             return map;
-    })
+        })
 }
 
 fn normalize_map(hashmap: &mut HashMap<char, f32>, n: f32) {
@@ -110,27 +123,27 @@ pub fn character_frequency_score(cipher_message: &[u8]) -> f32 {
     //check if can be converted into text, if not then return max score
     match String::from_utf8(cipher_message.to_vec()) {
         Ok(..) => {}
-        Err(..) => {return std::f32::MAX}
+        Err(..) => return std::f32::MAX,
     }
 
     //otherwise we compute residual wrt expected frequencies
     let mut expected_freqs = HashMap::from(EXPECTED_FREQUENCIES);
     normalize_map(&mut expected_freqs, text_length);
-    let score = get_frequency_map(cipher_message).iter().
-    map(|(key, val)| {
-        match expected_freqs.get(&key) {
-            Some(e_freq) => {return (e_freq - val).powi(2)}
-            None => {return 100f32}
-        }
-    }).
-    fold(0f32, |a, x| {a + x});
+    let score = get_frequency_map(cipher_message)
+        .iter()
+        .map(|(key, val)| match expected_freqs.get(&key) {
+            Some(e_freq) => return (e_freq - val).powi(2),
+            None => return 100f32,
+        })
+        .fold(0f32, |a, x| a + x);
     return score;
 }
 
 fn hamming_score(bytes1: &[u8], bytes2: &[u8]) -> f64 {
-    fixed_xor(bytes1, bytes2).into_iter().
-    map(|byte| byte.count_ones() as f64).
-    fold(0f64, |a, b| {a + b})
+    fixed_xor(bytes1, bytes2)
+        .into_iter()
+        .map(|byte| byte.count_ones() as f64)
+        .fold(0f64, |a, b| a + b)
 }
 
 fn get_norm(msg_len: usize, keysize: usize) -> f64 {
@@ -143,10 +156,13 @@ fn get_keysizes(encrypted_bytes: &[u8]) -> usize {
     for keysize in 1..40 {
         let norm = get_norm(encrypted_bytes.len(), keysize);
         let chunks = encrypted_bytes.chunks(keysize).collect::<Vec<&[u8]>>();
-        let score = chunks.into_iter().tuple_combinations::<(&[u8], &[u8])>().
-        fold(0f64, |x, chunk_pair| {
-            x + hamming_score(chunk_pair.0, chunk_pair.1)
-        }).div(norm);
+        let score = chunks
+            .into_iter()
+            .tuple_combinations::<(&[u8], &[u8])>()
+            .fold(0f64, |x, chunk_pair| {
+                x + hamming_score(chunk_pair.0, chunk_pair.1)
+            })
+            .div(norm);
         scores.push((keysize, score));
     }
     scores.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -174,20 +190,22 @@ pub fn decrypt_single_byte_xor_frequency(input: Vec<u8>) -> Vec<u8> {
 }
 
 fn transpose(input: &[u8], size: usize) -> Vec<Vec<u8>> {
-    input.into_iter().enumerate().
-    fold(vec![Vec::new(); size],
-    |mut trans, (i, byte)| {
-        let index = i.checked_rem(size).unwrap();
-        trans[index].push(*byte);
-        return trans;
-    })
+    input
+        .into_iter()
+        .enumerate()
+        .fold(vec![Vec::new(); size], |mut trans, (i, byte)| {
+            let index = i.checked_rem(size).unwrap();
+            trans[index].push(*byte);
+            return trans;
+        })
 }
 
 pub fn break_rep_key_xor(encrypted_bytes: &[u8]) -> Vec<u8> {
     let keysize = get_keysizes(encrypted_bytes);
-    let key: Vec<u8> = transpose(encrypted_bytes, keysize).iter().map(|input| { 
-        break_single_byte_xor_frequency(&input)
-    }).collect();
-    
+    let key: Vec<u8> = transpose(encrypted_bytes, keysize)
+        .iter()
+        .map(|input| break_single_byte_xor_frequency(&input))
+        .collect();
+
     return key;
 }
